@@ -19,16 +19,11 @@
         }],
         ["OS=='win'", {
           "sources": ["native/windows.cpp"],
+          "libraries": [ "-lpsapi.lib" ],
           "msvs_settings": {
             "VCCLCompilerTool": {
               "ExceptionHandling": 1
             }
-          }
-        }],
-        ["OS=='mac'", {
-          "sources": ["native/macos.cpp"],
-          "xcode_settings": {
-            "GCC_ENABLE_CPP_EXCEPTIONS": "YES"
           }
         }]
       ]

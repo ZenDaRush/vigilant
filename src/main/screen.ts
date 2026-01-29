@@ -1,60 +1,59 @@
-import { ipcMain } from "electron";
-export function vigilant() {
-    ipcMain.handle("get-all-processes", async () => {
-        try {
-            if (!nativeAddon) {
-                throw new Error("Native addon not loaded");
-            }
-            const processes = nativeAddon.getProcesses();
-            return { success: true, data: processes };
-        } catch (error: any) {
-            console.error("Error getting processes:", error);
-            return { success: false, error: error.message };
-        }
-    });
+function getExternalApps(processes) {
+    const systemKeywords = [
+        "systemd",
+        "dbus",
+        "pipewire",
+        "wireplumber",
+        "sd-pam",
+        "gnome-keyring",
+        "daemon",
+        "pulse",
+        "rtkit",
+        "gvfs",
+        "at-spi",
+        "dconf",
+        "polkit",
+        "svchost",
+        "runtimebroker",
+        "explorer.exe",
+        "lsass",
+        "services.exe",
+        "wininit",
+        "smss",
+        "csrss",
+        "conhost",
+        "dllhost",
+        "taskhostw",
+        "shellexperiencehost",
+        "searchindexer",
+        "spoolsv",
+        "nifm",
+    ];
 
-    ipcMain.handle("get-user-apps", async () => {
-        try {
-            if (!nativeAddon) {
-                throw new Error("Native addon not loaded");
-            }
-            const processes = nativeAddon.getProcesses();
-            const userApps = processes.filter((p: any) => p.isUserApp);
-            return { success: true, data: userApps };
-        } catch (error: any) {
-            return { success: false, error: error.message };
-        }
-    });
+    return processes.filter((proc) => {
+        const cmd = proc.cmd.toLowerCase();
+        const name = proc.name ? proc.name.toLowerCase() : "";
 
-    ipcMain.handle("get-gui-apps", async () => {
-        try {
-            if (!nativeAddon) {
-                throw new Error("Native addon not loaded");
-            }
-            const processes = nativeAddon.getProcesses();
-            const guiApps = processes.filter((p: any) => p.isGuiApp);
-            return { success: true, data: guiApps };
-        } catch (error: any) {
-            return { success: false, error: error.message };
-        }
-    });
+        const isElectronChild =
+            cmd.includes("--type=") || cmd.includes("electron");
+        const isHighMemory = proc.memory > 50;
 
-    ipcMain.handle("search-process", async (event, query: string) => {
-        try {
-            if (!nativeAddon) {
-                throw new Error("Native addon not loaded");
-            }
-            const processes = nativeAddon.getProcesses();
-            const results = processes.filter(
-                (p: any) =>
-                    p.name.toLowerCase().includes(query.toLowerCase()) ||
-                    p.cmd.toLowerCase().includes(query.toLowerCase()) ||
-                    (p.username &&
-                        p.username.toLowerCase().includes(query.toLowerCase()))
-            );
-            return { success: true, data: results };
-        } catch (error: any) {
-            return { success: false, error: error.message };
-        }
+        const isUserFacing = proc.isUserApp || proc.isGuiApp;
+
+        const isNoise = systemKeywords.some(
+            (kw) => cmd.includes(kw) || name.includes(kw)
+        );
+
+        const isSystemPath =
+            cmd.includes("/usr/lib/") ||
+            cmd.includes("c:\\windows\\system32") ||
+            cmd.includes("c:\\windows\\syswow64");
+
+        if (isNoise && !isHighMemory) return false;
+        if (isSystemPath && !isHighMemory) return false;
+
+        return (isUserFacing || isHighMemory) && !isNoise;
     });
 }
+
+export { getExternalApps };

@@ -4,13 +4,10 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
-#include <vector>
 
-bool IsGuiProcess(const std::string& pid, const std::string& cmd) {
-    if (cmd.find("--type=renderer") != std::string::npos) return true;
-
-    std::string envPath = "/proc/" + pid + "/environ";
-    std::ifstream envFile(envPath);
+// Helper to check for GUI environment
+bool IsGui(const std::string& pid) {
+    std::ifstream envFile("/proc/" + pid + "/environ");
     std::string env;
     while (std::getline(envFile, env, '\0')) {
         if (env.find("DISPLAY=") == 0 || env.find("WAYLAND_DISPLAY=") == 0) {
@@ -24,42 +21,29 @@ ProcessInfo ParseProcStat(const std::string& pid) {
     ProcessInfo info;
     info.pid = std::stoul(pid);
 
-    std::string cmdlinePath = "/proc/" + pid + "/cmdline";
-    std::ifstream cmdFile(cmdlinePath);
-    std::stringstream ss;
-    char c;
-    while (cmdFile.get(c)) {
-        ss << (c == '\0' ? ' ' : c);
-    }
-    info.cmd = ss.str();
-
-    char exePath[1024];
-    ssize_t len = readlink(("/proc/" + pid + "/exe").c_str(), exePath, sizeof(exePath)-1);
-    if (len != -1) {
-        exePath[len] = '\0';
-        info.path = std::string(exePath);
-    }
-
-    // Get UID and User Info from /proc/[pid]/status
+    // Get UID and User status
     std::ifstream statusFile("/proc/" + pid + "/status");
     std::string line;
     while (std::getline(statusFile, line)) {
         if (line.find("Uid:") == 0) {
             std::sscanf(line.c_str(), "Uid: %u", &info.uid);
-            // On most Linux distros, UIDs >= 1000 are actual users
             info.isUserApp = (info.uid >= 1000);
+            break;
         }
     }
 
-    // Memory: Use Resident Set Size (RSS) instead of Virtual Size
+    // Get Memory and Cmdline
     std::ifstream statmFile("/proc/" + pid + "/statm");
-    unsigned long vms, rss;
-    if (statmFile >> vms >> rss) {
-        long pageSize = sysconf(_SC_PAGESIZE);
-        info.memory = (double)(rss * pageSize) / (1024 * 1024); // Memory in MB
+    unsigned long rss;
+    if (statmFile >> rss >> rss) {
+        info.memory = (double)(rss * sysconf(_SC_PAGESIZE)) / (1024 * 1024);
     }
 
-    info.isGuiApp = IsGuiProcess(pid, info.cmd);
+    std::ifstream cmdFile("/proc/" + pid + "/cmdline");
+    char c;
+    while (cmdFile.get(c)) info.cmd += (c == '\0' ? ' ' : c);
+
+    info.isGuiApp = IsGui(pid);
     return info;
 }
 
@@ -71,7 +55,11 @@ std::vector<ProcessInfo> GetProcessList() {
     struct dirent* entry;
     while ((entry = readdir(dir)) != nullptr) {
         if (isdigit(entry->d_name[0])) {
-            processes.push_back(ParseProcStat(entry->d_name));
+            ProcessInfo info = ParseProcStat(entry->d_name);
+            // FILTER: Return only if it is a User App OR a GUI App
+            if (info.isUserApp || info.isGuiApp) {
+                processes.push_back(info);
+            }
         }
     }
     closedir(dir);

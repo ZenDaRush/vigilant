@@ -3,8 +3,7 @@ import path from "path";
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
 import started from "electron-squirrel-startup";
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
-
+import { getExternalApps } from "./main/screen";
 let nativeAddon: any;
 try {
     nativeAddon = require(
@@ -56,63 +55,12 @@ ipcMain.handle("get-all-processes", async () => {
             throw new Error("Native addon not loaded");
         }
         const processes = nativeAddon.getProcesses();
-        return { success: true, data: processes };
+        const value = await getExternalApps(processes);
+        console.log(value , value.length);
+        return { success: true, data: value };
     } catch (error: any) {
         console.error("Error getting processes:", error);
         return { success: false, error: error.message };
-    }
-});
-
-ipcMain.handle("get-user-apps", async () => {
-    try {
-        if (!nativeAddon) {
-            throw new Error("Native addon not loaded");
-        }
-        const processes = nativeAddon.getProcesses();
-        const userApps = processes.filter((p: any) => p.isUserApp);
-        return { success: true, data: userApps };
-    } catch (error: any) {
-        return { success: false, error: error.message };
-    }
-});
-
-ipcMain.handle("get-gui-apps", async () => {
-    try {
-        if (!nativeAddon) {
-            throw new Error("Native addon not loaded");
-        }
-        const processes = nativeAddon.getProcesses();
-        const guiApps = processes.filter((p: any) => p.isGuiApp);
-        return { success: true, data: guiApps };
-    } catch (error: any) {
-        return { success: false, error: error.message };
-    }
-});
-
-ipcMain.handle("search-process", async (event, query: string) => {
-    try {
-        if (!nativeAddon) {
-            throw new Error("Native addon not loaded");
-        }
-        const processes = nativeAddon.getProcesses();
-        const results = processes.filter(
-            (p: any) =>
-                p.name.toLowerCase().includes(query.toLowerCase()) ||
-                p.cmd.toLowerCase().includes(query.toLowerCase()) ||
-                (p.username &&
-                    p.username.toLowerCase().includes(query.toLowerCase()))
-        );
-        return { success: true, data: results };
-    } catch (error: any) {
-        return { success: false, error: error.message };
-    }
-});
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
-app.on("window-all-closed", () => {
-    if (process.platform !== "darwin") {
-        app.quit();
     }
 });
 
