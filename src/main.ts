@@ -5,7 +5,6 @@ declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 import started from "electron-squirrel-startup";
-import { getExternalApps } from "./main/screen";
 
 let nativeAddon: any;
 try {
@@ -24,7 +23,8 @@ if (started) {
 const createWindow = () => {
     // Get primary display dimensions
     const primaryDisplay = screen.getPrimaryDisplay();
-    const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+    const { width: screenWidth, height: screenHeight } =
+        primaryDisplay.workAreaSize;
 
     // Define window dimensions
     const windowWidth = 300;
@@ -63,7 +63,7 @@ const createWindow = () => {
     }
 
     // Open the DevTools (comment out in production)
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+    mainWindow.webContents.openDevTools({ mode: "detach" });
 };
 
 // This method will be called when Electron has finished
@@ -77,19 +77,25 @@ ipcMain.handle("get-all-processes", async () => {
             throw new Error("Native addon not loaded");
         }
         const processes = nativeAddon.getProcesses();
-        const value = await getExternalApps(processes);
-        console.log(value, value.length);
-        return { success: true, data: value };
+        return { success: true, data: processes };
     } catch (error: any) {
         console.error("Error getting processes:", error);
         return { success: false, error: error.message };
     }
 });
-
+ipcMain.handle("get-gui-apps-only", async () => {
+    try {
+        if (!nativeAddon) throw new Error("Native addon not loaded");
+        const guiApps = nativeAddon.getGuiApps();
+        return { success: true, data: guiApps };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+});
 // Add IPC handler to close the window
 ipcMain.on("close-window", () => {
     const windows = BrowserWindow.getAllWindows();
-    windows.forEach(window => window.close());
+    windows.forEach((window) => window.close());
 });
 
 // Add IPC handler to minimize the window (optional)

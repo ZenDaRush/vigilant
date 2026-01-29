@@ -10,12 +10,11 @@ function ProcessWidget() {
         async function loadProcesses() {
             try {
                 const { data: result }: { data: Process[] } =
-                    await window.processAPI.getAllProcesses();
+                    await window.processAPI.getGuiAppsOnly();
 
                 // 1. Filter out empty names
                 // 2. Sort alphabetically by name
-console.log(result , "result")
-
+                console.log(result, "result");
 
                 setProcesses(result);
             } catch (error) {
@@ -29,7 +28,7 @@ console.log(result , "result")
         const interval = setInterval(loadProcesses, 5000);
         return () => clearInterval(interval);
     }, []);
-console.log(processes)
+    console.log(processes);
     return (
         <div className="max-w-md mx-auto bg-slate-900 text-white rounded-xl shadow-2xl border border-slate-700">
             <div className="p-4 border-b border-slate-700 flex justify-between items-center">

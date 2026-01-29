@@ -3,15 +3,14 @@ import { contextBridge, ipcRenderer } from "electron";
 // Expose process API to renderer
 contextBridge.exposeInMainWorld("processAPI", {
     getAllProcesses: () => ipcRenderer.invoke("get-all-processes"),
-    getUserApps: () => ipcRenderer.invoke("get-user-apps"),
-    getGuiApps: () => ipcRenderer.invoke("get-gui-apps"),
-    searchProcess: (query: string) =>
-        ipcRenderer.invoke("search-process", query),
+    getGuiAppsOnly: () => ipcRenderer.invoke("get-gui-apps-only"),
 });
 
 declare global {
     interface Window {
         processAPI: {
+            getGuiAppsOnly: () => Promise<any>;
+
             getAllProcesses: () => Promise<any>;
         };
     }
