@@ -1,6 +1,6 @@
 {
-    "name": "desktop-bd",
-    "productName": "desktop-bd",
+    "name": "vigilant",
+    "productName": "vigilant",
     "version": "1.0.0",
     "description": "My Electron application description",
     "main": ".vite/build/main.js",
