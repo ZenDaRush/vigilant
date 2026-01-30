@@ -20,7 +20,12 @@ try {
 if (started) {
   app.quit();
 }
+app.disableHardwareAcceleration();
 
+if (process.platform === 'win32') {
+  app.commandLine.appendSwitch('disable-gpu');
+  app.commandLine.appendSwitch('disable-software-rasterizer');
+}
 const createWindow = () => {
   // Get primary display dimensions
   const primaryDisplay = screen.getPrimaryDisplay();
