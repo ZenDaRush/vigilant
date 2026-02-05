@@ -117,4 +117,4 @@ For issues, questions, or suggestions, please open an issue on [GitHub](https://
 
 ---
 
-<p align="center">Made with pure hate for interviewers who assume the gynmatics </p>
+<p align="center">Made with pure !❤️ and a healthy dose of paranoia</p>
