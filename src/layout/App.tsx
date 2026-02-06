@@ -8,6 +8,7 @@ import {
   Terminal,
   Box,
   X,
+  Zap,
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 
@@ -20,11 +21,31 @@ export interface Process {
   confidence?: number;
   username: string;
   isGuiApp?: boolean;
+  path?: string;
+}
+
+function isElectronProcess(p: Process): boolean {
+  const cmd = p.cmd?.toLowerCase() || '';
+  const name = p.name?.toLowerCase() || '';
+  const path = (p.path || '').toLowerCase();
+
+  return (
+    cmd.includes('electron') ||
+    name === 'electron' ||
+    path.includes('electron') ||
+    cmd.includes('--type=renderer') ||
+    cmd.includes('--type=gpu-process') ||
+    cmd.includes('--type=utility') ||
+    cmd.includes('--type=zygote') ||
+    p.category === 'app_framework' ||
+    p.category === 'electron_app'
+  );
 }
 
 function getProcessMetadata(p: Process) {
   const cmd = p.cmd?.toLowerCase() || '';
   const name = p.name?.toLowerCase() || '';
+  const isElectron = isElectronProcess(p);
 
   if (
     p.category === 'editor' ||
@@ -35,6 +56,7 @@ function getProcessMetadata(p: Process) {
       name: 'VS Code',
       icon: <Code2 size={16} className="text-blue-400" />,
       isUnknown: false,
+      isElectron: true,
     };
   }
 
@@ -48,6 +70,7 @@ function getProcessMetadata(p: Process) {
       name: 'Web Browser',
       icon: <Chrome size={16} className="text-amber-500" />,
       isUnknown: false,
+      isElectron: false,
     };
   }
 
@@ -67,6 +90,7 @@ function getProcessMetadata(p: Process) {
       name: displayName,
       icon: <AppWindow size={16} className="text-blue-300" />,
       isUnknown: false,
+      isElectron: false,
     };
   }
 
@@ -75,6 +99,7 @@ function getProcessMetadata(p: Process) {
       name: 'Discord',
       icon: <MessageSquare size={16} className="text-indigo-400" />,
       isUnknown: false,
+      isElectron: true,
     };
   }
   if (cmd.includes('telegram')) {
@@ -82,6 +107,16 @@ function getProcessMetadata(p: Process) {
       name: 'Telegram',
       icon: <Send size={16} className="text-sky-400" />,
       isUnknown: false,
+      isElectron: false,
+    };
+  }
+
+  if (cmd.includes('slack')) {
+    return {
+      name: 'Slack',
+      icon: <MessageSquare size={16} className="text-purple-400" />,
+      isUnknown: false,
+      isElectron: true,
     };
   }
 
@@ -96,6 +131,7 @@ function getProcessMetadata(p: Process) {
       name: 'Terminal',
       icon: <Terminal size={16} className="text-emerald-400" />,
       isUnknown: false,
+      isElectron: false,
     };
   }
 
@@ -109,6 +145,7 @@ function getProcessMetadata(p: Process) {
       name: 'Node.js / NPM',
       icon: <Box size={16} className="text-yellow-500" />,
       isUnknown: false,
+      isElectron: false,
     };
   }
 
@@ -117,6 +154,7 @@ function getProcessMetadata(p: Process) {
       name: 'File Explorer',
       icon: <AppWindow size={16} className="text-blue-300" />,
       isUnknown: false,
+      isElectron: false,
     };
   }
 
@@ -125,6 +163,24 @@ function getProcessMetadata(p: Process) {
       name: cmd.includes('shell') ? 'Gnome Shell' : 'Text Editor',
       icon: <AppWindow size={16} className="text-purple-400" />,
       isUnknown: false,
+      isElectron: false,
+    };
+  }
+
+  if (p.category && !['unknown', 'cli_tool'].includes(p.category)) {
+    const rawName =
+      p.name?.trim() || p.cmd?.split(' ')[0].split('/').pop() || 'App';
+    const cleanName = rawName.replace(/\.exe/gi, '');
+
+    return {
+      name: cleanName,
+      icon: isElectron ? (
+        <Zap size={16} className="text-indigo-400" />
+      ) : (
+        <AppWindow size={16} className="text-blue-400" />
+      ),
+      isUnknown: false,
+      isElectron: isElectron,
     };
   }
 
@@ -134,32 +190,36 @@ function getProcessMetadata(p: Process) {
 
   return {
     name: cleanName,
-    icon: (
+    icon: isElectron ? (
+      <Zap size={16} className="text-red-500" />
+    ) : (
       <AlertTriangle
         size={16}
         className={p.memory > 500 ? 'text-red-500' : 'text-yellow-500'}
       />
     ),
     isUnknown: true,
+    isElectron: isElectron,
   };
 }
 
 export default function ProcessWidget() {
   const [processes, setProcesses] = useState<
-    (Process & { isUnknown: boolean })[]
+    (Process & { isUnknown: boolean; isElectron: boolean })[]
   >([]);
   const [loading, setLoading] = useState(true);
-
+  console.log(processes, 'proccs');
   useEffect(() => {
     async function loadProcesses() {
       try {
-        const { data: guiApps } = await window.processAPI.getGuiAppsOnly();
         const { data: allApps } = await window.processAPI.getAllProcesses();
-        const combinedRaw: Process[] = [...guiApps, ...allApps];
+
+        const combinedRaw: Process[] = [...allApps];
         const uniqueProcesses = new Map<
           string,
-          Process & { isUnknown: boolean }
+          Process & { isUnknown: boolean; isElectron: boolean }
         >();
+
         combinedRaw
           .filter(p => p.cmd?.trim())
           .filter(p => !p.cmd.toLowerCase().includes('vigilant'))
@@ -187,12 +247,17 @@ export default function ProcessWidget() {
                   ...p,
                   name: displayName,
                   isUnknown: metadata.isUnknown,
+                  isElectron: metadata.isElectron,
                 });
               }
             }
           });
 
         const sorted = Array.from(uniqueProcesses.values()).sort((a, b) => {
+          if (a.isUnknown && a.isElectron && !(b.isUnknown && b.isElectron))
+            return -1;
+          if (!(a.isUnknown && a.isElectron) && b.isUnknown && b.isElectron)
+            return 1;
           if (a.isUnknown !== b.isUnknown) return a.isUnknown ? -1 : 1;
           return a.name.localeCompare(b.name);
         });
@@ -248,27 +313,30 @@ export default function ProcessWidget() {
         {processes.length > 0 ? (
           processes.map(p => {
             const { icon } = getProcessMetadata(p);
-            const isHighMemUnknown = p.isUnknown && p.memory > 500;
-            const isLowMemUnknown = p.isUnknown && p.memory <= 500;
+            const isUnknownElectron = p.isUnknown && p.isElectron;
+            const isHighMemUnknown =
+              p.isUnknown && !p.isElectron && p.memory > 500;
+            const isLowMemUnknown =
+              p.isUnknown && !p.isElectron && p.memory <= 500;
 
             return (
               <div
                 key={p.name}
                 className={`group p-3 border-b border-slate-800/50 transition-all flex justify-between items-center
-                                    ${p.isUnknown ? (isHighMemUnknown ? 'bg-red-500/5' : 'bg-yellow-500/5') : 'hover:bg-slate-800/40'}
-                                    ${isHighMemUnknown ? 'border-l-4 border-l-red-500' : isLowMemUnknown ? 'border-l-4 border-l-yellow-500' : ''}`}
+                  ${isUnknownElectron ? 'bg-red-500/10' : p.isUnknown ? (isHighMemUnknown ? 'bg-red-500/5' : 'bg-yellow-500/5') : 'hover:bg-slate-800/40'}
+                  ${isUnknownElectron ? 'border-l-4 border-l-red-600' : isHighMemUnknown ? 'border-l-4 border-l-red-500' : isLowMemUnknown ? 'border-l-4 border-l-yellow-500' : ''}`}
               >
                 <div className="flex items-center gap-3 overflow-hidden">
                   <div
                     className={`p-2 rounded-lg transition-transform group-hover:scale-110
-                                         ${p.isUnknown ? (isHighMemUnknown ? 'bg-red-500/20' : 'bg-yellow-500/20') : 'bg-slate-800'}`}
+                      ${isUnknownElectron ? 'bg-red-600/30' : p.isUnknown ? (isHighMemUnknown ? 'bg-red-500/20' : 'bg-yellow-500/20') : 'bg-slate-800'}`}
                   >
                     {icon}
                   </div>
                   <div className="flex flex-col overflow-hidden">
                     <span
                       className={`text-sm font-semibold truncate
-                                             ${isHighMemUnknown ? 'text-red-300' : isLowMemUnknown ? 'text-yellow-300' : p.isUnknown ? 'text-yellow-400' : 'text-slate-100'}`}
+                        ${isUnknownElectron ? 'text-red-400' : isHighMemUnknown ? 'text-red-300' : isLowMemUnknown ? 'text-yellow-300' : p.isUnknown ? 'text-yellow-400' : 'text-slate-100'}`}
                     >
                       {p.name}
                     </span>
@@ -280,7 +348,7 @@ export default function ProcessWidget() {
                 <div className="flex flex-col items-end min-w-[90px]">
                   <span
                     className={`text-xs font-mono font-bold
-                                         ${isHighMemUnknown ? 'text-red-400' : isLowMemUnknown ? 'text-yellow-400' : p.isUnknown ? 'text-yellow-300' : 'text-emerald-400'}`}
+                      ${isUnknownElectron ? 'text-red-400' : isHighMemUnknown ? 'text-red-400' : isLowMemUnknown ? 'text-yellow-400' : p.isUnknown ? 'text-yellow-300' : 'text-emerald-400'}`}
                   >
                     {p.memory > 1024
                       ? `${(p.memory / 1024).toFixed(1)} GB`
@@ -289,9 +357,13 @@ export default function ProcessWidget() {
                   {p.isUnknown && (
                     <span
                       className={`text-[8px] px-1.5 py-0.5 rounded mt-1 font-black uppercase tracking-wider
-                                            ${isHighMemUnknown ? 'bg-red-600 text-white ring-2 ring-red-400' : 'bg-yellow-600 text-white'}`}
+                        ${isUnknownElectron ? 'bg-red-600 text-white ring-2 ring-red-500' : isHighMemUnknown ? 'bg-red-600 text-white ring-2 ring-red-400' : 'bg-yellow-600 text-white'}`}
                     >
-                      {isHighMemUnknown ? 'Critical Unknown' : 'Unknown'}
+                      {isUnknownElectron
+                        ? '⚡ Unknown Electron'
+                        : isHighMemUnknown
+                          ? 'Critical Unknown'
+                          : 'Unknown'}
                     </span>
                   )}
                 </div>

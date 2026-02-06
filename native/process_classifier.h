@@ -14,7 +14,7 @@ struct ProcessClassification {
 
 class ProcessClassifier {
 private:
-    const double MIN_GUI_APP_MEMORY = 20.0;
+    const double MIN_DISPLAY_MEMORY = 20.0;  
 
 #ifdef _WIN32
     std::vector<std::string> systemPaths = {
@@ -31,6 +31,12 @@ private:
         "dwm.exe", "fontdrvhost.exe", "sihost.exe", "smartscreen.exe",
         "conhost.exe", "dllhost.exe", "audiodg.exe"
     };
+    
+    
+    std::vector<std::string> systemGuiPatterns = {
+        "startmenuexperiencehost.exe", "searchapp.exe", 
+        "shellexperiencehost.exe", "textinputhost.exe"
+    };
 #else
     std::vector<std::string> systemPaths = {
         "/usr/libexec/", "/usr/lib/systemd/", "/lib/systemd/",
@@ -43,28 +49,85 @@ private:
     std::vector<std::string> systemProcessPatterns = {
         "systemd", "kthreadd", "ksoftirqd", "kworker", "rcu_", "migration",
         "dbus", "gdm", "pipewire", "wireplumber", "pulseaudio",
-        "gnome-keyring", "xdg-", "gvfs", "at-spi", "fusermount",
-        "gnome-session", "gsd-", "evolution-", "tracker-", "ibus-",
-        "dconf-service", "upowerd", "systemd-", "NetworkManager",
-        "polkitd", "rtkit-daemon", "udisksd", "accounts-daemon",
-        "gnome-shell-", "org.gnome.", "gjs", "gcr-ssh-agent"
+        "gnome-keyring", "xdg-desktop-portal", "gvfs", "at-spi", "fusermount",
+        "gnome-session", "gsd-", "evolution-source-registry", "evolution-calendar-factory",
+        "evolution-addressbook-factory", "evolution-data-server", "evolution-alarm-notify",
+        "tracker-miner", "ibus-", "dconf-service", "upowerd", "systemd-", 
+        "NetworkManager", "polkitd", "rtkit-daemon", "udisksd", "accounts-daemon",
+        "goa-daemon", "gcr-ssh-agent", "xwayland", "mutter-x11-frames",
+        "gnome-shell-calendar-server", "ibus-extension-gtk", "ibus-x11",
+        "/usr/bin/gjs" 
     };
 #endif
 
     struct AppPattern {
         std::string pattern;
         std::string category;
+        bool isElectron;
     };
 
     std::vector<AppPattern> guiAppPatterns = {
-        {"chrome", "browser"}, {"chromium", "browser"}, {"firefox", "browser"},
-        {"brave", "browser"}, {"edge", "browser"}, {"opera", "browser"},
-        {"code", "editor"}, {"vscode", "editor"}, {"sublime", "editor"},
-        {"notepad", "editor"}, {"gedit", "editor"}, {"vim", "editor"},
-        {"nautilus", "file_manager"}, {"dolphin", "file_manager"},
-        {"explorer", "file_manager"}, {"slack", "communication"},
-        {"discord", "communication"}, {"spotify", "media"}, {"vlc", "media"},
-        {"electron", "app_framework"}, {"node", "development"}
+        
+        {"chrome", "browser", false}, 
+        {"chromium", "browser", false}, 
+        {"firefox", "browser", false},
+        {"brave", "browser", false}, 
+        {"edge", "browser", false}, 
+        {"msedge", "browser", false},
+        {"opera", "browser", false},
+        {"safari", "browser", false},
+        
+        
+        {"code", "editor", true},  
+        {"vscode", "editor", true},
+        {"sublime", "editor", false},
+        {"sublime_text", "editor", false},
+        {"notepad", "editor", false},
+        {"gedit", "editor", false},
+        {"vim", "editor", false},
+        {"atom", "editor", true},  
+        
+        
+        {"nautilus", "file_manager", false},
+        {"dolphin", "file_manager", false},
+        {"explorer.exe", "file_manager", false},
+        
+        
+        {"slack", "communication", true},  
+        {"discord", "communication", true}, 
+        {"teams", "communication", true},  
+        {"zoom", "communication", false},
+        {"skype", "communication", true},
+        {"telegram", "communication", false},
+        {"signal", "communication", true},
+        
+        
+        {"spotify", "media", true},  
+        {"vlc", "media", false},
+        
+        
+        {"gnome-terminal", "terminal", false},
+        {"konsole", "terminal", false},
+        {"alacritty", "terminal", false},
+        {"kitty", "terminal", false},
+        
+        
+        {"node", "development", false},
+        {"python", "development", false},
+        {"java", "development", false},
+        
+        
+        {"electron", "app_framework", true},
+        {"nwjs", "app_framework", false},
+        
+        
+        {"onedrive", "cloud_storage", false},
+        {"dropbox", "cloud_storage", false},
+        {"google drive", "cloud_storage", false},
+        
+        
+        {"dominik", "app", true},  
+        {"vigilant", "app", true}  
     };
 
     bool containsPattern(const std::string& str, const std::vector<std::string>& patterns) {
@@ -85,13 +148,76 @@ private:
         return false;
     }
 
-    std::string findCategory(const std::string& str) {
+    AppPattern findAppPattern(const std::string& str) {
         std::string lowerStr = str;
         std::transform(lowerStr.begin(), lowerStr.end(), lowerStr.begin(), ::tolower);
         for (const auto& app : guiAppPatterns) {
-            if (lowerStr.find(app.pattern) != std::string::npos) return app.category;
+            if (lowerStr.find(app.pattern) != std::string::npos) {
+                return app;
+            }
         }
-        return "unknown";
+        return {"", "unknown", false};
+    }
+    
+    bool isElectronApp(const std::string& name, const std::string& cmd, const std::string& path) {
+        std::string lowerName = name;
+        std::string lowerCmd = cmd;
+        std::string lowerPath = path;
+        
+        std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
+        std::transform(lowerCmd.begin(), lowerCmd.end(), lowerCmd.begin(), ::tolower);
+        std::transform(lowerPath.begin(), lowerPath.end(), lowerPath.begin(), ::tolower);
+        
+        
+        if (lowerName.find("electron") != std::string::npos ||
+            lowerCmd.find("electron") != std::string::npos ||
+            lowerPath.find("electron") != std::string::npos) {
+            return true;
+        }
+        
+        
+        AppPattern pattern = findAppPattern(lowerName.empty() ? lowerCmd : lowerName);
+        if (pattern.isElectron) {
+            return true;
+        }
+        
+        
+        if (lowerCmd.find("--type=") != std::string::npos && 
+            (lowerCmd.find("--type=renderer") != std::string::npos ||
+             lowerCmd.find("--type=gpu-process") != std::string::npos ||
+             lowerCmd.find("--type=utility") != std::string::npos ||
+             lowerCmd.find("--type=zygote") != std::string::npos)) {
+            return true;
+        }
+        
+        
+        if ((lowerCmd.find("chrome") != std::string::npos || 
+             lowerCmd.find("code") != std::string::npos) &&
+            (lowerCmd.find("--type=") != std::string::npos)) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    bool isSystemGuiComponent(const std::string& name, const std::string& cmd) {
+#ifdef _WIN32
+        return containsPattern(name, systemGuiPatterns) || 
+               containsPattern(cmd, systemGuiPatterns);
+#else
+        
+        std::string lowerCmd = cmd;
+        std::transform(lowerCmd.begin(), lowerCmd.end(), lowerCmd.begin(), ::tolower);
+        
+        if (lowerCmd.find("gnome-shell") != std::string::npos ||
+            lowerCmd.find("org.gnome.shell") != std::string::npos ||
+            lowerCmd.find("org.gnome.screensaver") != std::string::npos ||
+            lowerCmd.find("/usr/bin/gjs") != std::string::npos ||
+            lowerCmd.find("gnome.notifications") != std::string::npos) {
+            return true;
+        }
+        return false;
+#endif
     }
 
 public:
@@ -101,21 +227,18 @@ public:
     ) {
         ProcessClassification result;
         result.confidence = 0.5;
-        result.shouldDisplay = true;
-
-        // Basic system noise filtering
-        if (memory < MIN_GUI_APP_MEMORY || isSystemPath(path) ||
-            containsPattern(name, systemProcessPatterns) || containsPattern(cmd, systemProcessPatterns)) {
-            result.shouldDisplay = false;
-        }
+        result.shouldDisplay = false;
 
 #ifdef _WIN32
+        
         if (pid <= 4) {
             result.type = "system_process";
+            result.category = "kernel";
             result.shouldDisplay = false;
             return result;
         }
 #else
+        
         if (pid < 100 && cmd.empty()) {
             result.type = "system_process";
             result.category = "kernel_thread";
@@ -124,23 +247,70 @@ public:
         }
 #endif
 
-        if (isGuiApp && memory >= MIN_GUI_APP_MEMORY) {
-            result.type = "gui_app";
-            result.category = findCategory(name.empty() ? cmd : name);
-            result.confidence = (result.category != "unknown") ? 0.85 : 0.7;
-            result.shouldDisplay = true;
-        } else if (isUserApp) {
-            result.type = "user_app";
-            result.category = findCategory(name);
-            if (result.category == "unknown") result.category = "cli_tool";
-            result.confidence = 0.6;
-            result.shouldDisplay = (memory >= MIN_GUI_APP_MEMORY);
-        } else {
+        
+        if (isSystemGuiComponent(name, cmd)) {
             result.type = "system_process";
-            result.category = "other";
+            result.category = "system_ui";
             result.shouldDisplay = false;
+            return result;
         }
 
+        
+        if (isSystemPath(path) || 
+            containsPattern(name, systemProcessPatterns) || 
+            containsPattern(cmd, systemProcessPatterns)) {
+            result.type = "system_process";
+            result.category = "system";
+            result.shouldDisplay = false;
+            return result;
+        }
+
+        
+        bool isElectron = isElectronApp(name, cmd, path);
+        
+        
+        AppPattern pattern = findAppPattern(name.empty() ? cmd : name);
+        
+        
+        if (isGuiApp || isElectron) {
+            result.type = "gui_app";
+            result.category = pattern.category;
+            result.confidence = (pattern.category != "unknown") ? 0.85 : 0.7;
+            
+            
+            result.shouldDisplay = isElectron || (pattern.category != "unknown") || 
+                                   (memory >= MIN_DISPLAY_MEMORY);
+            
+            if (isElectron && result.category == "unknown") {
+                result.category = "electron_app";
+            }
+            
+            return result;
+        }
+        
+        
+        if (isUserApp) {
+            result.type = "user_app";
+            result.category = pattern.category;
+            
+            if (result.category == "unknown") {
+                result.category = "cli_tool";
+            }
+            
+            result.confidence = (pattern.category != "unknown") ? 0.75 : 0.6;
+            
+            
+            result.shouldDisplay = (pattern.category != "unknown" && pattern.category != "cli_tool") || 
+                                   (memory >= MIN_DISPLAY_MEMORY);
+            
+            return result;
+        }
+
+        
+        result.type = "system_process";
+        result.category = "other";
+        result.shouldDisplay = false;
+        
         return result;
     }
 };
