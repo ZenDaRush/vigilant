@@ -17,7 +17,6 @@
 - **Smart Aggregation:** Automatically groups multi-process apps (Chrome, VS Code, Discord) into a single entry with summed memory usage.
 - **Zero Noise:** Strictly filters out system services like `evolution-data-server`, `update-notifier`, and `Xwayland`.
 - **Security Pulse:** Automatically flags unrecognized processes.
-- **Resource Alerts:** Unknown apps using more than **500MB** are highlighted with a critical red pulse.
 - **Developer Friendly:** Built-in recognition for `npm`, `node`, `yarn`, and `pnpm`.
 - **Live Monitoring:** Real-time process tracking with auto-refresh every 5 seconds.
 

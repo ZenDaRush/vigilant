@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.1.0](https://github.com/loarsaw/vigilant/compare/v1.0.0...v1.1.0) (2026-02-06)
+
+### Features
+
+- add application icons for Windows, and Linux ([b0fc6cf](https://github.com/loarsaw/vigilant/commit/b0fc6cfe1dedfac10820c44af33a2730607c8540))
+- prioritize unknown processes and integrate electron detection ([3d8c3a4](https://github.com/loarsaw/vigilant/commit/3d8c3a4ebf6de73565d3832ff1f2b34c6b26caa1))
+- synchronize cross-platform process logic and improve UI detection ([9524b61](https://github.com/loarsaw/vigilant/commit/9524b6178e808d314626136a75bea1578ce24716))
+- synchronize Windows and Linux process enumeration logic ([a31388b](https://github.com/loarsaw/vigilant/commit/a31388b0d95758163026b4c0db580c0c7ab28a99))
+
+### Bug Fixes
+
+- add Windows maker configuration for artifact generation ([be8f7aa](https://github.com/loarsaw/vigilant/commit/be8f7aabc81525c99ee5e19371551f71ba147cad))
+- resolve ProcessInfo field inconsistencies ([9c6956f](https://github.com/loarsaw/vigilant/commit/9c6956f36aea65486f9b387dfc2c2c0c8a04afab))
+
 ## 1.0.1 (2026-02-05)
 
 ### Features
