@@ -232,16 +232,3 @@ func RunMigrations(db *sql.DB) error {
 	log.Println("✅ Database migrations completed")
 	return nil
 }
-
-// Helper function to create a test candidate (for development)
-func CreateTestCandidate(db *sql.DB, email, password, fullName string) error {
-	// In production, use bcrypt to hash password
-	// For now, using plain text (DO NOT DO THIS IN PRODUCTION)
-	query := `
-		INSERT INTO candidates (email, password_hash, full_name)
-		VALUES ($1, $2, $3)
-		ON CONFLICT (email) DO NOTHING
-	`
-	_, err := db.Exec(query, email, password, fullName)
-	return err
-}

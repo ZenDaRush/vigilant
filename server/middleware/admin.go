@@ -11,11 +11,13 @@ import (
 
 func AdminAuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if cfg.AdminAuthToken == "" {
+			c.Next()
+			return
+		}
+
 		token := c.GetHeader("X-Admin-Token")
-
-
-
-        if token == "" {
+		if token == "" {
 			token = c.Query("X-Admin-Token")
 		}
 
@@ -31,8 +33,7 @@ func AdminAuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 		if len(allowedIPs) > 0 {
 			clientIP := getClientIP(c)
 			if !isIPAllowed(clientIP, allowedIPs) {
-
-                c.JSON(http.StatusForbidden, gin.H{
+				c.JSON(http.StatusForbidden, gin.H{
 					"error": "forbidden: IP address not authorized",
 				})
 				c.Abort()
@@ -56,8 +57,7 @@ func isIPAllowed(clientIP string, allowedIPs []string) bool {
 
 	for _, allowed := range allowedIPs {
 		if strings.Contains(allowed, "/") {
-
-            _, ipNet, err := net.ParseCIDR(allowed)
+			_, ipNet, err := net.ParseCIDR(allowed)
 			if err != nil {
 				continue
 			}
