@@ -6,9 +6,10 @@ import (
 	"log"
 	"net/http"
     "encoding/csv"
-    "time"
+    "path/filepath"
     "strings"
-
+    "time"
+    "github.com/xuri/excelize/v2"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 	"vigilant/models"
@@ -26,54 +27,70 @@ type AdminHandlers struct {
 	DB *sql.DB
 }
 
+func processRows(records [][]string) []UserData {
+	var users []UserData
+	for i, row := range records {
+		if i == 0 && (strings.ToLower(row[0]) == "name") {
+			continue
+		}
+		if len(row) >= 2 {
+			users = append(users, UserData{
+				Name:  strings.TrimSpace(row[0]),
+				Email: strings.TrimSpace(row[1]),
+			})
+		}
+	}
+	return users
+}
+
 func (h *AdminHandlers) ParseUserList(c *gin.Context) {
-	fileHeader, err := c.FormFile("file")
+fileHeader, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "No file was uploaded",
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "No file uploaded"})
 		return
 	}
 
+	extension := strings.ToLower(filepath.Ext(fileHeader.Filename))
+	var users []UserData
+
 	file, err := fileHeader.Open()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "Could not process file",
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "File open error"})
 		return
 	}
 	defer file.Close()
 
-	reader := csv.NewReader(file)
+	if extension == ".csv" {
+		reader := csv.NewReader(file)
+		records, err := reader.ReadAll()
+		if err != nil {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Invalid CSV format"})
+			return
+		}
+		users = processRows(records)
 
-    records, err := reader.ReadAll()
-	if err != nil {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{
-			"success": false,
-			"error":   "Failed to parse CSV content",
-		})
+	} else if extension == ".xlsx" {
+		xlFile, err := excelize.OpenReader(file)
+		if err != nil {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Invalid Excel format"})
+			return
+		}
+		defer xlFile.Close()
+
+		sheetName := xlFile.GetSheetName(0)
+		rows, err := xlFile.GetRows(sheetName)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error reading Excel sheet"})
+			return
+		}
+		users = processRows(rows)
+
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Unsupported file type. Please use .csv or .xlsx"})
 		return
 	}
 
-	var users []UserData
-
-	for i, row := range records {
-		if i == 0 && row[0] == "name" {
-			continue
-		}
-
-		if len(row) >= 2 {
-			users = append(users, UserData{
-				Name:  row[0],
-				Email: row[1],
-			})
-		}
-	}
-
-
-    c.JSON(http.StatusOK, gin.H{
+	c.JSON(http.StatusOK, gin.H{
 		"success":   true,
 		"count":     len(users),
 		"data":      users,
