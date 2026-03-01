@@ -1,6 +1,6 @@
 {
-  "name": "vigilant",
-  "productName": "Vigilant",
+  "name": "vigilant-admin",
+  "productName": "vigilant-admin",
   "version": "1.0.0-beta",
   "description": "Vigilant candidate monitoring client",
   "main": ".vite/build/main.js",
@@ -42,6 +42,7 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@electron-forge/publisher-github": "^7.11.1",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-label": "^2.1.8",
