@@ -20,7 +20,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useCandidates } from '@/hooks/use-candidates';
-import { apiClient } from '@/lib/axios';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -31,6 +30,20 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, X } from 'lucide-react';
+import { SearchBar } from '@/components/search-bar';
+import { PaginationBar } from '@/components/pagination-bar';
+
+
+
+// ─── Pagination Bar ────────────────────────────────────────────────────────────
+
+
+
+// ─── Search Bar ────────────────────────────────────────────────────────────────
+
+
+// ─── Dashboard ─────────────────────────────────────────────────────────────────
 
 export function Dashboard() {
   const router = useNavigate();
@@ -46,19 +59,25 @@ export function Dashboard() {
 
   const {
     candidates,
+    total,
+    totalPages,
+    page,
+    limit,
+    search,
+    setPage,
+    setLimit,
+    setSearch,
     isLoading,
     isError,
     updateCandidate,
-    isUpdating
+    isUpdating,
+    addCandidate,
+    isAdding,
   } = useCandidates();
 
-  const interviewCandidates = candidates.filter(
-    (c) => c.current_stage_qualified && !c.interview_completed
-  );
-
-  const completedCandidates = candidates.filter(
-    (c) => c.interview_completed
-  );
+  // These filter the current page's data only — the server handles full-dataset filtering.
+  const interviewCandidates = candidates.filter((c) => c.current_stage_qualified && !c.interview_completed);
+  const completedCandidates = candidates.filter((c) => c.interview_completed);
 
   const uploadMutation = useUploadCsv();
 
@@ -66,9 +85,7 @@ export function Dashboard() {
     if (csv) {
       uploadMutation.mutate(csv, {
         onSuccess: (data) => {
-          if (data.success) {
-            router('/candidate-list');
-          }
+          if (data.success) router('/candidate-list');
         },
       });
     }
@@ -76,44 +93,36 @@ export function Dashboard() {
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setCSV(selectedFile);
-    }
+    if (selectedFile) setCSV(selectedFile);
   };
 
-  const onClickButton = () => {
-    fileInputRef.current?.click();
-  };
-
-  async function addCandidate(e: FormEvent<HTMLFormElement>) {
+  const handleAddCandidate = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    await apiClient.post('/candidates', {
-      full_name: newCandidateName,
-      email: newCandidateEmail,
-      password: newCandidatePassword,
-    });
-    setOpenDialog(false);
-  }
-
-  const handleQualifyStage = (id: number) => {
-    updateCandidate({
-      id,
-      payload: { current_stage_qualified: true },
-    });
+    addCandidate(
+      { full_name: newCandidateName, email: newCandidateEmail, password: newCandidatePassword },
+      {
+        onSuccess: () => {
+          setOpenDialog(false);
+          setNewCandidateName('');
+          setNewCandidateEmail('');
+          setNewCandidatePassword('');
+        },
+      }
+    );
   };
 
-  const handleCompleteInterview = (id: number) => {
-    updateCandidate({
-      id,
-      payload: { interview_completed: true },
-    });
-  };
+  const handleQualifyStage = (id: number) =>
+    updateCandidate({ id, payload: { current_stage_qualified: true } });
+
+  const handleCompleteInterview = (id: number) =>
+    updateCandidate({ id, payload: { interview_completed: true } });
 
   const user = { email: '', workspaceName: '' };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-secondary">
       <div className="container mx-auto px-4 py-8">
+
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -123,33 +132,19 @@ export function Dashboard() {
           <div className="flex gap-2">
             <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
               <DialogTrigger asChild>
-                <Button className="bg-accent text-accent-foreground hover:bg-accent/90">
-                  Import Candidates
-                </Button>
+                <Button className="bg-accent text-accent-foreground hover:bg-accent/90">Import Candidates</Button>
               </DialogTrigger>
               <DialogContent className="bg-card border-border">
                 <DialogHeader>
                   <DialogTitle className="text-foreground">Import Candidates</DialogTitle>
-                  <DialogDescription className="text-muted-foreground">
-                    Choose your import source
-                  </DialogDescription>
+                  <DialogDescription className="text-muted-foreground">Choose your import source</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-3">
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileChange}
-                    style={{ display: 'none' }}
-                  />
-                  <Button
-                    onClick={onClickButton}
-                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                  >
+                  <input type="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} />
+                  <Button onClick={() => fileInputRef.current?.click()} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
                     Import from CSV
                   </Button>
-                  <Button variant="outline" className="w-full border-border text-foreground">
-                    Import from Google Sheets
-                  </Button>
+                  <Button variant="outline" className="w-full border-border text-foreground">Import from Google Sheets</Button>
                 </div>
               </DialogContent>
             </Dialog>
@@ -166,13 +161,7 @@ export function Dashboard() {
                   </DialogDescription>
                 </DialogHeader>
                 <div className="flex gap-2 justify-end pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowPurgeDialog(false)}
-                    className="border-border text-foreground"
-                  >
-                    Cancel
-                  </Button>
+                  <Button variant="outline" onClick={() => setShowPurgeDialog(false)} className="border-border text-foreground">Cancel</Button>
                   <Button variant="destructive">Archive All</Button>
                 </div>
               </DialogContent>
@@ -182,7 +171,7 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* Stats Card */}
+        {/* Stats — use server `total` for the accurate count across all pages */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>Welcome, {user.email}</CardTitle>
@@ -192,7 +181,7 @@ export function Dashboard() {
             <div className="grid md:grid-cols-4 gap-4">
               <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <p className="text-sm font-medium text-blue-900">Total Candidates</p>
-                <p className="text-2xl font-bold text-blue-600 mt-2">{candidates.length}</p>
+                <p className="text-2xl font-bold text-blue-600 mt-2">{total}</p>
               </div>
               <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                 <p className="text-sm font-medium text-green-900">In Interview</p>
@@ -214,35 +203,43 @@ export function Dashboard() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="all">
-              All Candidates ({candidates.length})
-            </TabsTrigger>
+            <TabsTrigger value="all">All Candidates ({total})</TabsTrigger>
             <TabsTrigger value="interview">
               Interview ({interviewCandidates.length + completedCandidates.length})
             </TabsTrigger>
-            <TabsTrigger value="completed">
-              Completed ({completedCandidates.length})
-            </TabsTrigger>
+            <TabsTrigger value="completed">Completed ({completedCandidates.length})</TabsTrigger>
           </TabsList>
 
-          {/* ALL CANDIDATES TAB */}
+          {/* ── ALL CANDIDATES TAB ── */}
           <TabsContent value="all" className="mt-6 space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold">All Candidates</h2>
+            <div className="flex justify-between items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <h2 className="text-xl font-bold shrink-0">All Candidates</h2>
+                {/* Calls server — debounce handled inside useCandidates hook */}
+                <SearchBar
+                  value={search}
+                  onChange={(v) => { setSearch(v); setPage(1); }}
+                  placeholder="Search by name or email…"
+                />
+                {search && !isLoading && (
+                  <span className="text-sm text-muted-foreground shrink-0">
+                    {total} result{total !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+
               <Dialog open={openDialog} onOpenChange={setOpenDialog}>
                 <DialogTrigger asChild>
-                  <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
+                  <Button className="bg-primary text-primary-foreground hover:bg-primary/90 shrink-0">
                     Add New Candidate
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Add New Candidate</DialogTitle>
-                    <DialogDescription>
-                      Create a new candidate profile for your workspace
-                    </DialogDescription>
+                    <DialogDescription>Create a new candidate profile for your workspace</DialogDescription>
                   </DialogHeader>
-                  <form onSubmit={addCandidate} className="space-y-4">
+                  <form onSubmit={handleAddCandidate} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="candidate-fullname">Full Name</Label>
                       <Input
@@ -274,11 +271,8 @@ export function Dashboard() {
                         required
                       />
                     </div>
-                    <Button
-                      type="submit"
-                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                    >
-                      Create Candidate
+                    <Button type="submit" disabled={isAdding} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
+                      {isAdding ? 'Creating…' : 'Create Candidate'}
                     </Button>
                   </form>
                 </DialogContent>
@@ -297,12 +291,6 @@ export function Dashboard() {
                   <p className="text-destructive">Failed to load candidates.</p>
                 </CardContent>
               </Card>
-            ) : candidates.length === 0 ? (
-              <Card>
-                <CardContent className="pt-8 text-center">
-                  <p className="text-muted-foreground">No candidates yet. Create one to get started.</p>
-                </CardContent>
-              </Card>
             ) : (
               <Card>
                 <CardContent className="pt-6">
@@ -318,83 +306,86 @@ export function Dashboard() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {candidates.map((candidate) => (
-                          <TableRow
-                            key={candidate.id}
-                            className="cursor-pointer hover:bg-secondary/50 transition-colors"
-                            onClick={()=>{
-router(`/candidates/${candidate.id}`);
-                            }}
-                          >
-                            <TableCell className="font-medium">
-                              {candidate.full_name}
-                            </TableCell>
-                            <TableCell>{candidate.email}</TableCell>
-                            <TableCell>
-                              {candidate.interview_current_stage ? (
-                                <Badge variant="outline">
-                                  {candidate.interview_current_stage}
-                                </Badge>
-                              ) : (
-                                <span className="text-muted-foreground text-sm">Not started</span>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {candidate.interview_completed ? (
-                                <Badge className="bg-green-100 text-green-800">Completed</Badge>
-                              ) : candidate.current_stage_qualified ? (
-                                <Badge className="bg-blue-100 text-blue-800">In Interview</Badge>
-                              ) : (
-                                <Badge variant="outline">Pending</Badge>
-                              )}
-                            </TableCell>
-                            <TableCell
-                              className="space-x-2"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {!candidate.current_stage_qualified && !candidate.interview_completed && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={isUpdating}
-                                  onClick={() => handleQualifyStage(candidate.id)}
-                                >
-                                  Qualify
-                                </Button>
-                              )}
-                              {candidate.current_stage_qualified && !candidate.interview_completed && (
-                                <Button
-                                  size="sm"
-                                  className="bg-primary text-primary-foreground hover:bg-primary/90"
-                                  disabled={isUpdating}
-                                  onClick={() => handleCompleteInterview(candidate.id)}
-                                >
-                                  Mark Complete
-                                </Button>
-                              )}
+                        {candidates.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                              {search ? `No candidates match "${search}"` : 'No candidates yet. Create one to get started.'}
                             </TableCell>
                           </TableRow>
-                        ))}
+                        ) : (
+                          candidates.map((candidate) => (
+                            <TableRow
+                              key={candidate.id}
+                              className="cursor-pointer hover:bg-secondary/50 transition-colors"
+                              onClick={() => router(`/candidates/${candidate.id}`)}
+                            >
+                              <TableCell className="font-medium">{candidate.full_name}</TableCell>
+                              <TableCell>{candidate.email}</TableCell>
+                              <TableCell>
+                                {candidate.interview_current_stage ? (
+                                  <Badge variant="outline">{candidate.interview_current_stage}</Badge>
+                                ) : (
+                                  <span className="text-muted-foreground text-sm">Not started</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {candidate.interview_completed ? (
+                                  <Badge className="bg-green-100 text-green-800">Completed</Badge>
+                                ) : candidate.current_stage_qualified ? (
+                                  <Badge className="bg-blue-100 text-blue-800">In Interview</Badge>
+                                ) : (
+                                  <Badge variant="outline">Pending</Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="space-x-2" onClick={(e) => e.stopPropagation()}>
+                                {!candidate.current_stage_qualified && !candidate.interview_completed && (
+                                  <Button size="sm" variant="outline" disabled={isUpdating} onClick={() => handleQualifyStage(candidate.id)}>
+                                    Qualify
+                                  </Button>
+                                )}
+                                {candidate.current_stage_qualified && !candidate.interview_completed && (
+                                  <Button
+                                    size="sm"
+                                    className="bg-primary text-primary-foreground hover:bg-primary/90"
+                                    disabled={isUpdating}
+                                    onClick={() => handleCompleteInterview(candidate.id)}
+                                  >
+                                    Mark Complete
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
                       </TableBody>
                     </Table>
                   </div>
+                  {/* Fully server-driven — passes server totals and page directly */}
+                  <PaginationBar
+                    page={page}
+                    totalPages={totalPages}
+                    total={total}
+                    pageSize={limit}
+                    onPageChange={setPage}
+                    onPageSizeChange={(s) => { setLimit(s); setPage(1); }}
+                  />
                 </CardContent>
               </Card>
             )}
           </TabsContent>
 
-          {/* INTERVIEW TAB - qualified but not yet completed + completed */}
+          {/* ── INTERVIEW TAB ── */}
           <TabsContent value="interview" className="mt-6">
             <Card>
               <CardHeader>
                 <CardTitle>Candidates in Interview Process</CardTitle>
                 <CardDescription>
-                  Candidates who have qualified and are actively being interviewed
+                  Showing qualified candidates from the current page. Use the All tab to search across all candidates.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {interviewCandidates.length === 0 && completedCandidates.length === 0 ? (
-                  <p className="text-muted-foreground">No candidates in interview yet.</p>
+                  <p className="text-muted-foreground">No candidates in interview on this page.</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <Table>
@@ -409,58 +400,42 @@ router(`/candidates/${candidate.id}`);
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {/* Active interview candidates */}
-                        {interviewCandidates.map((candidate) => (
-                          <TableRow key={candidate.id} className="hover:bg-secondary/50">
-                            <TableCell className="font-medium">{candidate.full_name}</TableCell>
-                            <TableCell>{candidate.email}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">
-                                {candidate.interview_current_stage || 'Initial'}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <span className="text-muted-foreground text-sm">
-                                {candidate.interview_next_stage || '—'}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <Badge className="bg-blue-100 text-blue-800">In Progress</Badge>
-                            </TableCell>
-                            <TableCell onClick={(e) => e.stopPropagation()}>
-                              <Button
-                                size="sm"
-                                className="bg-primary text-primary-foreground hover:bg-primary/90"
-                                disabled={isUpdating}
-                                onClick={() => handleCompleteInterview(candidate.id)}
-                              >
-                                Mark Complete
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-
-                        {/* Completed interview candidates in same list */}
-                        {completedCandidates.map((candidate) => (
-                          <TableRow key={candidate.id} className="hover:bg-secondary/50 opacity-75">
-                            <TableCell className="font-medium">{candidate.full_name}</TableCell>
-                            <TableCell>{candidate.email}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">
-                                {candidate.interview_current_stage || '—'}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <span className="text-muted-foreground text-sm">—</span>
-                            </TableCell>
-                            <TableCell>
-                              <Badge className="bg-green-100 text-green-800">Completed</Badge>
-                            </TableCell>
-                            <TableCell>
-                              <span className="text-muted-foreground text-sm">—</span>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {[...interviewCandidates, ...completedCandidates].map((candidate) => {
+                          const isCompleted = candidate.interview_completed;
+                          return (
+                            <TableRow key={candidate.id} className={`hover:bg-secondary/50 ${isCompleted ? 'opacity-75' : ''}`}>
+                              <TableCell className="font-medium">{candidate.full_name}</TableCell>
+                              <TableCell>{candidate.email}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{candidate.interview_current_stage || 'Initial'}</Badge>
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-muted-foreground text-sm">{candidate.interview_next_stage || '—'}</span>
+                              </TableCell>
+                              <TableCell>
+                                {isCompleted ? (
+                                  <Badge className="bg-green-100 text-green-800">Completed</Badge>
+                                ) : (
+                                  <Badge className="bg-blue-100 text-blue-800">In Progress</Badge>
+                                )}
+                              </TableCell>
+                              <TableCell onClick={(e) => e.stopPropagation()}>
+                                {!isCompleted ? (
+                                  <Button
+                                    size="sm"
+                                    className="bg-primary text-primary-foreground hover:bg-primary/90"
+                                    disabled={isUpdating}
+                                    onClick={() => handleCompleteInterview(candidate.id)}
+                                  >
+                                    Mark Complete
+                                  </Button>
+                                ) : (
+                                  <span className="text-muted-foreground text-sm">—</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>
@@ -469,18 +444,18 @@ router(`/candidates/${candidate.id}`);
             </Card>
           </TabsContent>
 
-          {/* COMPLETED TAB */}
+          {/* ── COMPLETED TAB ── */}
           <TabsContent value="completed" className="mt-6">
             <Card>
               <CardHeader>
                 <CardTitle>Completed Interviews</CardTitle>
                 <CardDescription>
-                  Candidates who have finished the interview process
+                  Showing completed candidates from the current page. Use the All tab to search across all candidates.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {completedCandidates.length === 0 ? (
-                  <p className="text-muted-foreground">No completed interviews yet.</p>
+                  <p className="text-muted-foreground">No completed interviews on this page.</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <Table>
@@ -498,9 +473,7 @@ router(`/candidates/${candidate.id}`);
                             <TableCell className="font-medium">{candidate.full_name}</TableCell>
                             <TableCell>{candidate.email}</TableCell>
                             <TableCell>
-                              <Badge variant="outline">
-                                {candidate.interview_current_stage || '—'}
-                              </Badge>
+                              <Badge variant="outline">{candidate.interview_current_stage || '—'}</Badge>
                             </TableCell>
                             <TableCell>
                               <Badge className="bg-green-100 text-green-800">✓ Done</Badge>

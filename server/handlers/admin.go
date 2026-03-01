@@ -14,6 +14,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 	"vigilant/models"
+	"strconv"
+	"math"
 	"vigilant/websocket"
 
 )
@@ -338,15 +340,50 @@ func (h *AdminHandlers) CreateCandidate(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, candidate)
 }
-
 func (h *AdminHandlers) ListCandidates(c *gin.Context) {
-	query := `
+	pageStr := c.DefaultQuery("page", "1")
+	limitStr := c.DefaultQuery("limit", "10")
+	search := strings.TrimSpace(c.Query("search"))
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit < 1 || limit > 100 {
+		limit = 10
+	}
+	offset := (page - 1) * limit
+
+	args := []interface{}{}
+	where := ""
+	if search != "" {
+		where = "WHERE (email ILIKE $1 OR full_name ILIKE $1)"
+		args = append(args, "%"+search+"%")
+	}
+
+	var total int
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM candidates %s", where)
+	err = h.DB.QueryRow(countQuery, args...).Scan(&total)
+	if err != nil {
+		log.Printf("Error counting candidates: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to count candidates"})
+		return
+	}
+
+	limitPlaceholder := fmt.Sprintf("$%d", len(args)+1)
+	offsetPlaceholder := fmt.Sprintf("$%d", len(args)+2)
+	args = append(args, limit, offset)
+
+	dataQuery := fmt.Sprintf(`
 		SELECT id, email, full_name, created_at, updated_at, is_active, last_login
 		FROM candidates
+		%s
 		ORDER BY created_at DESC
-	`
+		LIMIT %s OFFSET %s
+	`, where, limitPlaceholder, offsetPlaceholder)
 
-	rows, err := h.DB.Query(query)
+	rows, err := h.DB.Query(dataQuery, args...)
 	if err != nil {
 		log.Printf("Error querying candidates: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve candidates"})
@@ -360,30 +397,28 @@ func (h *AdminHandlers) ListCandidates(c *gin.Context) {
 	}
 
 	candidates := []CandidateWithPresence{}
-
 	for rows.Next() {
 		var cand models.Candidate
-		err := rows.Scan(
-			&cand.ID,
-			&cand.Email,
-			&cand.FullName,
-			&cand.CreatedAt,
-			&cand.UpdatedAt,
-			&cand.IsActive,
-			&cand.LastLogin,
-		)
-		if err != nil {
+		if err := rows.Scan(
+			&cand.ID, &cand.Email, &cand.FullName,
+			&cand.CreatedAt, &cand.UpdatedAt, &cand.IsActive, &cand.LastLogin,
+		); err != nil {
 			log.Printf("Error scanning candidate: %v", err)
 			continue
 		}
-
 		candidates = append(candidates, CandidateWithPresence{
 			Candidate: cand,
 			IsOnline:  websocket.Manager.IsActive(fmt.Sprintf("%d", cand.ID)),
 		})
 	}
 
-	c.JSON(http.StatusOK, candidates)
+	c.JSON(http.StatusOK, gin.H{
+		"data":        candidates,
+		"total":       total,
+		"page":        page,
+		"limit":       limit,
+		"total_pages": int(math.Ceil(float64(total) / float64(limit))),
+	})
 }
 
 func (h *AdminHandlers) GetCandidate(c *gin.Context) {
