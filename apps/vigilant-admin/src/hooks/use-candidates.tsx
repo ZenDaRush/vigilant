@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/axios';
+import { useEffect, useState } from 'react';
 
 export interface Candidate {
   id: number;
@@ -18,6 +19,22 @@ interface CandidateResponse {
   candidate: Candidate;
   is_online: boolean;
 }
+
+
+interface PaginatedResponse {
+  data: Candidate[];
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+}
+
+interface CandidateQueryParams {
+  page: number;
+  limit: number;
+  search: string;
+}
+
 
 export interface UpdateCandidatePayload {
   full_name?: string;
@@ -39,8 +56,8 @@ interface ActiveUsersResponse {
   count: number;
 }
 
-async function fetchCandidates(): Promise<Candidate[]> {
-  const response = await apiClient.get<Candidate[]>('/candidates');
+async function fetchCandidates(params: CandidateQueryParams): Promise<PaginatedResponse> {
+  const response = await apiClient.get<PaginatedResponse>('/candidates', { params });
   return response.data;
 }
 
@@ -58,15 +75,36 @@ async function fetchActiveUsers(): Promise<ActiveUsersResponse> {
   return response.data;
 }
 
+async function createCandidate(payload: { full_name: string; email: string; password: string }): Promise<Candidate> {
+  const response = await apiClient.post<Candidate>('/candidates', payload);
+  return response.data;
+}
+
+
 export function useCandidates() {
   const queryClient = useQueryClient();
 
-  const { data, isLoading, isError, error, refetch } = useQuery<Candidate[], Error>({
-    queryKey: ['candidates'],
-    queryFn: fetchCandidates,
-    staleTime: 1000 * 60 * 5,
-  });
+ const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [search, setSearch] = useState('');
 
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  const { data, isLoading, isError, error, refetch } = useQuery<PaginatedResponse, Error>({
+    queryKey: ['candidates', { page, limit, search: debouncedSearch }],
+    queryFn: () => fetchCandidates({ page, limit, search: debouncedSearch }),
+    staleTime: 1000 * 60 * 2,
+    placeholderData: (prev) => prev, 
+    
+  });
   const { data: activeUsersData } = useQuery<ActiveUsersResponse, Error>({
     queryKey: ['admin', 'active-users'],
     queryFn: fetchActiveUsers,
@@ -83,6 +121,13 @@ const useCandidate = (id: string | undefined) => {
   });
 };
 
+
+const createMutation = useMutation<Candidate, Error, Parameters<typeof createCandidate>[0]>({
+  mutationFn: createCandidate,
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['candidates'] }); 
+  },
+});
   const updateMutation = useMutation<void, Error, UpdateCandidateVariables>({
     mutationFn: updateCandidate,
     onSuccess: (_, variables) => {
@@ -101,13 +146,23 @@ const useCandidate = (id: string | undefined) => {
     },
   });
 
-  const candidatesWithPresence = (data ?? []).map((candidate) => ({
-    ...candidate,
-    isOnline: activeUsersData?.active_users.includes(String(candidate.id)) ?? false,
-  }));
+  
+const candidatesWithPresence = (data?.data ?? []).map((candidate) => ({
+  ...candidate,
+  isOnline: activeUsersData?.active_users.includes(String(candidate.id)) ?? false,
+}));
+  
 
-  return {
+return {
     candidates: candidatesWithPresence,
+   total: data?.total ?? 0,
+   page,
+    limit,
+    search,
+    setPage,
+    setLimit,
+    setSearch,
+    totalPages: data?.total_pages ?? 1,
     isLoading,
     isError,
     error: error?.message ?? null,
@@ -117,6 +172,9 @@ const useCandidate = (id: string | undefined) => {
     activeUserCount: activeUsersData?.count ?? 0,
 
     useCandidate,
+
+    addCandidate: createMutation.mutate,
+    isAdding: createMutation.isPending,
 
     updateCandidate: updateMutation.mutate,
     isUpdating: updateMutation.isPending,
