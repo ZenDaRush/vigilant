@@ -19,7 +19,7 @@ var SupportedLanguages = map[Language]bool{
 }
 
 type Submission struct {
-	ID        int64     `json:"id"`
+	ID        string    `json:"id"`
 	Language  Language  `json:"language"`
 	Code      string    `json:"code"`
 	Stdout    string    `json:"stdout"`
@@ -33,5 +33,5 @@ type Submission struct {
 
 type ExecuteRequest struct {
 	Language Language `json:"language" binding:"required"`
-	Code     string   `json:"code"     binding:"required"`
+	Code     string   `json:"code_b64" binding:"required"`
 }

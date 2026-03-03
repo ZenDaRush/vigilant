@@ -7,15 +7,17 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	
 
 	"github.com/gin-gonic/gin"
 	"vigilant/executor"
+	"encoding/base64"
 	"vigilant/models"
 )
 
 
-func saveSubmission(db *sql.DB, s *models.Submission) (int64, error) {
-	var id int64
+func saveSubmission(db *sql.DB, s *models.Submission) (string, error) {
+	var id string
 	err := db.QueryRow(`
 		INSERT INTO judge_submissions
 			(language, code, stdout, stderr, exit_code, time_ms, memory_kb, status)
@@ -27,7 +29,7 @@ func saveSubmission(db *sql.DB, s *models.Submission) (int64, error) {
 	return id, err
 }
 
-func getSubmission(db *sql.DB, id int64) (*models.Submission, error) {
+func getSubmission(db *sql.DB, id string) (*models.Submission, error) {
 	s := &models.Submission{}
 	err := db.QueryRow(`
 		SELECT id, language, code, stdout, stderr, exit_code, time_ms, memory_kb, status, created_at
@@ -77,12 +79,19 @@ func (h *Handlers) ExecuteCode(c *gin.Context) {
 		return
 	}
 
-	if strings.TrimSpace(req.Code) == "" {
+	codeBytes, err := base64.StdEncoding.DecodeString(req.Code)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "code_b64 must be valid base64"})
+		return
+	}
+
+	code := strings.TrimSpace(string(codeBytes))
+	if code == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "code cannot be empty"})
 		return
 	}
 
-	result, err := executor.Execute(req.Language, req.Code)
+	result, err := executor.Execute(req.Language, code) 
 	if err != nil {
 		log.Printf("[judge] execution error lang=%s err=%v", req.Language, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "execution failed"})
@@ -98,7 +107,7 @@ func (h *Handlers) ExecuteCode(c *gin.Context) {
 
 	sub := &models.Submission{
 		Language:  req.Language,
-		Code:      req.Code,
+		Code:      code, 
 		Stdout:    result.Stdout,
 		Stderr:    result.Stderr,
 		ExitCode:  result.ExitCode,
@@ -107,20 +116,20 @@ func (h *Handlers) ExecuteCode(c *gin.Context) {
 		Status:    status,
 		CreatedAt: time.Now(),
 	}
+    id, err := saveSubmission(h.DB, sub)
+    if err != nil {
+      log.Printf("[judge] db save error: %v", err)
+    } else {
+      sub.ID = id
+    }	                         
 
-	id, err := saveSubmission(h.DB, sub)
-	if err != nil {
-		log.Printf("[judge] db save error: %v", err)
-		// still return result — don't fail the user
-	}
-	sub.ID = id
 
 	c.JSON(http.StatusOK, sub)
 }
 
 func (h *Handlers) GetSubmission(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
+	id := c.Param("id")
+	if id == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
 		return
 	}
@@ -137,7 +146,6 @@ func (h *Handlers) GetSubmission(c *gin.Context) {
 
 	c.JSON(http.StatusOK, sub)
 }
-
 func (h *Handlers) ListSubmissions(c *gin.Context) {
 	limit := 50
 	if l, err := strconv.Atoi(c.Query("limit")); err == nil && l > 0 && l <= 200 {

@@ -10,6 +10,19 @@ x-logging:
 x-runner-common:
   &runner-common
   restart: always
+  read_only: true
+  tmpfs:
+    - /tmp:size=32m
+  mem_limit: 256m
+  memswap_limit: 256m
+  cpus: "0.5"
+  pids_limit: 50
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  networks:
+    - runners
   logging:
     driver: json-file
     options:
@@ -35,6 +48,9 @@ services:
         condition: service_started
       runner-java:
         condition: service_started
+    networks:
+      - public
+      - runners
     <<: *default-logging
     restart: always
 
@@ -44,6 +60,8 @@ services:
     env_file: vigilant.conf
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - public
     <<: *default-logging
     restart: always
     healthcheck:
@@ -82,3 +100,8 @@ services:
 
 volumes:
   postgres_data:
+
+networks:
+  public:
+  runners:
+    internal: true
