@@ -1,11 +1,15 @@
 import ReactDOM from 'react-dom/client';
-
 import './index.css';
 import { HashRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import CodeEditor from './app/pages/code';
+import Sandbox from './app/pages/code/sandbox';
+import CodeEditor from "./app/pages//code/code-editor"
 import LoginPage from './app/pages/auth/login';
 import WaitingSetup from './app/pages/auth/waiting';
+import AppLayout, {
+  AuthLayout,
+  ProtectedLayout,
+} from './components/layout/app-layout';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
@@ -15,9 +19,16 @@ root.render(
   <QueryClientProvider client={queryClient}>
     <HashRouter>
       <Routes>
-      <Route path="/" Component={LoginPage} />
-      <Route path="/wait" Component={WaitingSetup}/>
-      <Route path="/code/:id" Component={CodeEditor}/>
+        <Route Component={AppLayout}>
+          <Route Component={AuthLayout}>
+            <Route path="/" Component={LoginPage} />
+          </Route>
+          <Route Component={ProtectedLayout}>
+            <Route path="/wait" Component={WaitingSetup} />
+            <Route path="/code/:id" Component={Sandbox} />
+            <Route path="/editor" Component={CodeEditor}/>
+          </Route>
+        </Route>
       </Routes>
     </HashRouter>
   </QueryClientProvider>

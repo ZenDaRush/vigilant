@@ -80,6 +80,14 @@ func main() {
 		api.GET("/sessions", h.ListSessions)
 		api.POST("/sessions/:session_id/end", h.EndSession)
 	}
+
+	judge := api.Group("/judge")
+	{
+		judge.GET("/languages",           h.ListLanguages)
+		judge.POST("/execute",           h.ExecuteCode)
+		judge.GET("/submissions",        h.ListSubmissions)
+		judge.GET("/submissions/:id",    h.GetSubmission)
+	}
     
     r.GET("/api/v1/events", h.SSEEvents)
 	websocket.Manager.Cfg = cfg
