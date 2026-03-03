@@ -12,7 +12,7 @@ x-runner-common:
   restart: always
   read_only: true
   tmpfs:
-    - /tmp:size=32m
+    - /tmp:size=32m,mode=777,exec
   mem_limit: 256m
   memswap_limit: 256m
   cpus: "0.5"
@@ -48,6 +48,9 @@ services:
         condition: service_started
       runner-java:
         condition: service_started
+      runner-python:
+        condition: service_started        
+        
     networks:
       - public
       - runners
@@ -96,6 +99,13 @@ services:
       context: ./server/runners
       dockerfile: java/Dockerfile
     container_name: vigilant-runner-java
+    <<: *runner-common
+
+  runner-python:
+    build:
+      context: ./server/runners
+      dockerfile: python/Dockerfile
+    container_name: vigilant-runner-python
     <<: *runner-common
 
 volumes:

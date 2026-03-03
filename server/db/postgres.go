@@ -254,6 +254,10 @@ func RunMigrations(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_process_reports_session ON process_reports(session_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_process_reports_reported ON process_reports(reported_at DESC)`,
 
+		// ========================================
+		// MIGRATION 10: Code Judge table
+		// ========================================
+
 		`CREATE TABLE IF NOT EXISTS judge_submissions (
             id         UUID      PRIMARY KEY DEFAULT gen_random_uuid(),
             language   TEXT      NOT NULL,

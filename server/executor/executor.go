@@ -12,10 +12,11 @@ import (
 )
 
 var runnerURLs = map[models.Language]string{
-	models.LangC:    "http://runner-c:8080/run",
-	models.LangCPP:  "http://runner-cpp:8080/run",
-	models.LangJS:   "http://runner-js:8080/run",
-	models.LangJava: "http://runner-java:8080/run",
+    models.LangC:      "http://runner-c:8080/run",
+    models.LangCPP:    "http://runner-cpp:8080/run",
+    models.LangJS:     "http://runner-js:8080/run",
+    models.LangJava:   "http://runner-java:8080/run",
+    models.LangPython: "http://runner-python:8080/run",
 }
 
 type RunRequest struct {

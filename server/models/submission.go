@@ -5,18 +5,21 @@ import "time"
 type Language string
 
 const (
-	LangC    Language = "c"
-	LangCPP  Language = "cpp"
-	LangJS   Language = "js"
-	LangJava Language = "java"
+    LangC      Language = "c"
+    LangCPP    Language = "cpp"
+    LangJS     Language = "js"
+    LangJava   Language = "java"
+    LangPython Language = "python"
 )
 
 var SupportedLanguages = map[Language]bool{
-	LangC:    true,
-	LangCPP:  true,
-	LangJS:   true,
-	LangJava: true,
+    LangC:      true,
+    LangCPP:    true,
+    LangJS:     true,
+    LangJava:   true,
+    LangPython: true,
 }
+
 
 type Submission struct {
 	ID        string    `json:"id"`

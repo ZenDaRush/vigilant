@@ -27,7 +27,7 @@ type RunResponse struct {
 
 type langConfig struct {
 	sourceFile  string
-	compileArgs []string 
+	compileArgs []string
 	runArgs     []string
 }
 
@@ -51,6 +51,10 @@ var langs = map[string]langConfig{
 		compileArgs: []string{"javac", "/tmp/Main.java"},
 		runArgs:     []string{"java", "-cp", "/tmp", "Main"},
 	},
+	"python": {
+    sourceFile: "main.py",
+    runArgs:    []string{"python3", "/tmp/main.py"},
+    },
 }
 
 func handle(w http.ResponseWriter, r *http.Request) {
@@ -67,9 +71,9 @@ func handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Write source file
 	srcPath := filepath.Join("/tmp", cfg.sourceFile)
 	if err := os.WriteFile(srcPath, []byte(req.Code), 0644); err != nil {
+		log.Printf("[%s] write error: %v", language, err)
 		http.Error(w, `{"error":"write failed"}`, http.StatusInternalServerError)
 		return
 	}
@@ -82,13 +86,16 @@ func handle(w http.ResponseWriter, r *http.Request) {
 		cmd := exec.Command(cfg.compileArgs[0], cfg.compileArgs[1:]...)
 		cmd.Stdout = &compileOut
 		cmd.Stderr = &compileOut
+		cmd.Dir = "/tmp"
 		if err := cmd.Run(); err != nil {
+			log.Printf("[%s] compile error: %s", language, compileOut.String())
 			resp.Stderr = compileOut.String()
 			resp.ExitCode = 1
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(resp)
 			return
 		}
+		log.Printf("[%s] compiled successfully", language)
 	}
 
 	// Run
@@ -96,6 +103,7 @@ func handle(w http.ResponseWriter, r *http.Request) {
 	cmd := exec.Command(cfg.runArgs[0], cfg.runArgs[1:]...)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+	cmd.Dir = "/tmp"
 
 	start := time.Now()
 	err := cmd.Run()
@@ -110,9 +118,10 @@ func handle(w http.ResponseWriter, r *http.Request) {
 		} else {
 			resp.ExitCode = 1
 		}
+		log.Printf("[%s] run error (exit %d): %s", language, resp.ExitCode, resp.Stderr)
 	}
 
-	// Memory: read from /proc after run
+	// Memory via /proc/<pid>/status
 	if cmd.ProcessState != nil {
 		pidStr := fmt.Sprintf("/proc/%d/status", cmd.ProcessState.Pid())
 		if data, err := os.ReadFile(pidStr); err == nil {
@@ -126,6 +135,8 @@ func handle(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+
+	log.Printf("[%s] done — exit=%d time=%dms mem=%dkb", language, resp.ExitCode, resp.TimeMS, resp.MemoryKB)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)

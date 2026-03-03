@@ -83,6 +83,7 @@ func main() {
 
 	judge := api.Group("/judge")
 	{
+		judge.GET("/languages",           h.ListLanguages)
 		judge.POST("/execute",           h.ExecuteCode)
 		judge.GET("/submissions",        h.ListSubmissions)
 		judge.GET("/submissions/:id",    h.GetSubmission)

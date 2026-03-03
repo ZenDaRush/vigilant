@@ -16,6 +16,52 @@ import (
 )
 
 
+func (h *Handlers) ListLanguages(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"languages": []gin.H{
+			{
+				"id":      "c",
+				"name":    "C",
+				"example": base64.StdEncoding.EncodeToString([]byte(`#include <stdio.h>
+int main() {
+    printf("Hello, World!\n");
+    return 0;
+}`)),
+			},
+			{
+				"id":      "cpp",
+				"name":    "C++",
+				"example": base64.StdEncoding.EncodeToString([]byte(`#include <iostream>
+int main() {
+    std::cout << "Hello, World!" << std::endl;
+    return 0;
+}`)),
+			},
+			{
+				"id":      "js",
+				"name":    "JavaScript",
+				"example": base64.StdEncoding.EncodeToString([]byte(`console.log("Hello, World!")`)),
+			},
+			{
+    "id":      "python",
+    "name":    "Python",
+    "example": base64.StdEncoding.EncodeToString([]byte(`print("Hello, World!")`)),
+},
+			{
+				"id":      "java",
+				"name":    "Java",
+				"example": base64.StdEncoding.EncodeToString([]byte(`public class Main {
+    public static void main(String[] args) {
+        System.out.println("Hello, World!");
+    }
+}`)),
+			},
+		},
+	})
+}
+
+
+
 func saveSubmission(db *sql.DB, s *models.Submission) (string, error) {
 	var id string
 	err := db.QueryRow(`
