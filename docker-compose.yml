@@ -7,6 +7,27 @@ x-logging:
     options:
       max-size: 100M
 
+x-runner-common:
+  &runner-common
+  restart: always
+  read_only: true
+  tmpfs:
+    - /tmp:size=32m,mode=777,exec
+  mem_limit: 256m
+  memswap_limit: 256m
+  cpus: "0.5"
+  pids_limit: 50
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  networks:
+    - runners
+  logging:
+    driver: json-file
+    options:
+      max-size: 100M
+
 services:
   server:
     build: ./server
@@ -17,7 +38,22 @@ services:
       - ./vigilant.conf:/etc/vigilant/vigilant.conf:ro
     env_file: vigilant.conf
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+      runner-c:
+        condition: service_started
+      runner-cpp:
+        condition: service_started
+      runner-js:
+        condition: service_started
+      runner-java:
+        condition: service_started
+      runner-python:
+        condition: service_started        
+        
+    networks:
+      - public
+      - runners
     <<: *default-logging
     restart: always
 
@@ -27,6 +63,8 @@ services:
     env_file: vigilant.conf
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - public
     <<: *default-logging
     restart: always
     healthcheck:
@@ -35,5 +73,45 @@ services:
       timeout: 5s
       retries: 5
 
+  runner-c:
+    build:
+      context: ./server/runners
+      dockerfile: c/Dockerfile
+    container_name: vigilant-runner-c
+    <<: *runner-common
+
+  runner-cpp:
+    build:
+      context: ./server/runners
+      dockerfile: cpp/Dockerfile
+    container_name: vigilant-runner-cpp
+    <<: *runner-common
+
+  runner-js:
+    build:
+      context: ./server/runners
+      dockerfile: js/Dockerfile
+    container_name: vigilant-runner-js
+    <<: *runner-common
+
+  runner-java:
+    build:
+      context: ./server/runners
+      dockerfile: java/Dockerfile
+    container_name: vigilant-runner-java
+    <<: *runner-common
+
+  runner-python:
+    build:
+      context: ./server/runners
+      dockerfile: python/Dockerfile
+    container_name: vigilant-runner-python
+    <<: *runner-common
+
 volumes:
   postgres_data:
+
+networks:
+  public:
+  runners:
+    internal: true

@@ -17,7 +17,6 @@ export default function AppLayout() {
 
 export function AuthLayout() {
   const { isAuthenticated, isLoadingUser } = useAuth()
-  console.log(isAuthenticated , isLoadingUser , "values")
 
   if (isLoadingUser) {
     return (
@@ -29,7 +28,6 @@ export function AuthLayout() {
 
 
 
-//   if (isAuthenticated) return <Navigate to="/wait" replace />
 
   return <Outlet />
 }

@@ -16,7 +16,7 @@ export default function Success({ workspace, username, onProceed }: SuccessProps
   const handleProceed = async () => {
     try {
       await startInterview()
-      router("/wait")
+      router("/editor")
     } catch (err) {
     }
   }
