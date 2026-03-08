@@ -49,8 +49,8 @@ func (h *AdminHandlers) CreateCandidate(c *gin.Context) {
 
 	var candidate models.Candidate
 	err = h.DB.QueryRowContext(ctx, `
-		INSERT INTO candidates (email, password_hash, full_name, created_at, updated_at)
-		VALUES ($1, $2, $3, NOW(), NOW())
+		INSERT INTO candidates (email, password_hash, full_name)
+		VALUES ($1, $2, $3)
 		RETURNING id, email, full_name, created_at, is_active
 	`, req.Email, string(hashedPassword), req.FullName).Scan(
 		&candidate.ID,

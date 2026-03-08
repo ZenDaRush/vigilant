@@ -144,12 +144,12 @@ func (h *Handlers) CreateInterviewSession(c *gin.Context) {
     var id int
     var createdAt time.Time
 
-    err = h.DB.QueryRowContext(c.Request.Context(), `
-        INSERT INTO interview_sessions (
-            session_id, candidate_id, candidate_session_id, status, started_at
-        ) VALUES ($1, $2, $3, 'in_progress', NOW())
-        RETURNING id, created_at
-    `, sessionID, candidateID, req.CandidateSessionID).Scan(&id, &createdAt)
+	err = h.DB.QueryRowContext(c.Request.Context(), `
+		INSERT INTO interview_sessions (
+			session_id, candidate_id, candidate_session_id, status, started_at
+		) VALUES ($1, $2, $3, 'in_progress', CURRENT_TIMESTAMP)
+		RETURNING id, created_at
+	`, sessionID, candidateID, req.CandidateSessionID).Scan(&id, &createdAt)
 
     if err != nil {
         var pqErr *pq.Error
